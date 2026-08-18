@@ -12,13 +12,14 @@ to the originals. No database, no server.
 
 Optional add-ons (each off unless configured):
   - Reddit (r/berkeley):  set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET, pip install praw
-  - AI news filter + blurb tidy:  set ANTHROPIC_API_KEY, pip install anthropic
+  - AI news filter + blurb tidy:  run Ollama locally (https://ollama.com), pip install ollama
+                                   optionally set OLLAMA_MODEL (default: llama3.2)
 
 How "actual news" is enforced (see FILTERING below):
   1. Newsroom RSS feeds are trusted, with a light URL-path exclude (opinion, etc.).
   2. Reddit posts pass strict heuristics (score, not-a-question, not housing/advice).
-  3. If an Anthropic key is present, a cheap model classifies anything ambiguous
-     as news / not-news and drops the rest.
+  3. If a local Ollama server is reachable, a small model classifies anything
+     ambiguous as news / not-news and drops the rest.
 """
 
 import argparse
@@ -99,6 +100,7 @@ BLURB_WORDS = 28
 MAX_ITEMS = 60          # hard ceiling on cards (safety cap)
 MAX_AGE_HOURS = 24      # only show stories newer than this; override with --hours
 OUTPUT = "index.html"
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 
 # ==========================================================================
@@ -222,20 +224,20 @@ def dedupe(items: list) -> list:
 
 
 def ai_news_filter(items: list) -> list:
-    """Optional, gated on ANTHROPIC_API_KEY. Classify items as news / not-news.
+    """Optional, uses a local Ollama model. Classify items as news / not-news.
 
     Batched (one call per ~40 items) to keep it cheap. Fails open: if the call
-    errors, items pass through unchanged rather than emptying the page.
+    errors (e.g. Ollama isn't running), items pass through unchanged rather
+    than emptying the page.
     """
-    if not os.getenv("ANTHROPIC_API_KEY") or not items:
+    if not items:
         return items
     try:
-        import anthropic  # pip install anthropic
+        import ollama  # pip install ollama
     except ImportError:
-        print("  ! AI filter configured but anthropic not installed", file=sys.stderr)
+        print("  ! AI filter needs the ollama package (pip install ollama)", file=sys.stderr)
         return items
 
-    client = anthropic.Anthropic()
     kept = []
     for start in range(0, len(items), 40):
         chunk = items[start:start + 40]
@@ -251,12 +253,12 @@ def ai_news_filter(items: list) -> list:
             'Reply with ONLY a JSON object: {"keep": [list of integer indices]}'
         )
         try:
-            msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
+            resp = ollama.chat(
+                model=OLLAMA_MODEL,
                 messages=[{"role": "user", "content": prompt}],
+                options={"num_predict": 300},
             )
-            text = msg.content[0].text.strip().strip("`")
+            text = resp["message"]["content"].strip().strip("`")
             text = text[text.find("{"): text.rfind("}") + 1]
             keep_idx = set(json.loads(text).get("keep", []))
             kept += [chunk[i] for i in range(len(chunk)) if i in keep_idx]
@@ -271,25 +273,22 @@ def ai_news_filter(items: list) -> list:
 
 def maybe_tighten(items: list) -> list:
     """Optional. Rewrite blurbs to a uniform voice/length (mainly helps Reddit)."""
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        return items
     try:
-        import anthropic
+        import ollama
     except ImportError:
         return items
-    client = anthropic.Anthropic()
     for it in items:
         if not it["blurb"]:
             continue
         try:
-            msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=60,
+            resp = ollama.chat(
+                model=OLLAMA_MODEL,
                 messages=[{"role": "user", "content": (
                     "Rewrite as one neutral news blurb, max 20 words, just the facts. "
                     f"Return only the blurb:\n\n{it['title']} — {it['blurb']}")}],
+                options={"num_predict": 60},
             )
-            it["blurb"] = msg.content[0].text.strip()
+            it["blurb"] = resp["message"]["content"].strip()
         except Exception:  # noqa: BLE001
             pass
     return items
@@ -479,8 +478,8 @@ def main():
         items = within_window(items, args.hours)   # drop stale items before the costly passes
         print(f"  within last {args.hours:g}h: {len(items)}")
         items = dedupe(items)
-        items = ai_news_filter(items)   # optional, gated on ANTHROPIC_API_KEY
-        items = maybe_tighten(items)    # optional, gated on ANTHROPIC_API_KEY
+        items = ai_news_filter(items)   # optional, uses local Ollama if available
+        items = maybe_tighten(items)    # optional, uses local Ollama if available
 
     items.sort(key=lambda x: x["date"], reverse=True)
     items = items[:MAX_ITEMS]
