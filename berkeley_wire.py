@@ -12,13 +12,14 @@ to the originals. No database, no server.
 
 Optional add-ons (each off unless configured):
   - Reddit (r/berkeley):  set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET, pip install praw
-  - AI news filter + blurb tidy:  run Ollama locally (https://ollama.com), pip install ollama
-                                   optionally set OLLAMA_MODEL (default: llama3.2)
+  - AI news filter + blurb tidy:  set GROQ_API_KEY (free tier at https://console.groq.com),
+                                   pip install groq
+                                   optionally set GROQ_MODEL (default: llama-3.1-8b-instant)
 
 How "actual news" is enforced (see FILTERING below):
   1. Newsroom RSS feeds are trusted, with a light URL-path exclude (opinion, etc.).
   2. Reddit posts pass strict heuristics (score, not-a-question, not housing/advice).
-  3. If a local Ollama server is reachable, a small model classifies anything
+  3. If a Groq key is present, a fast free-tier model classifies anything
      ambiguous as news / not-news and drops the rest.
 """
 
@@ -100,7 +101,7 @@ BLURB_WORDS = 28
 MAX_ITEMS = 60          # hard ceiling on cards (safety cap)
 MAX_AGE_HOURS = 24      # only show stories newer than this; override with --hours
 OUTPUT = "index.html"
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
 
 # ==========================================================================
@@ -224,20 +225,20 @@ def dedupe(items: list) -> list:
 
 
 def ai_news_filter(items: list) -> list:
-    """Optional, uses a local Ollama model. Classify items as news / not-news.
+    """Optional, gated on GROQ_API_KEY. Classify items as news / not-news.
 
     Batched (one call per ~40 items) to keep it cheap. Fails open: if the call
-    errors (e.g. Ollama isn't running), items pass through unchanged rather
-    than emptying the page.
+    errors, items pass through unchanged rather than emptying the page.
     """
-    if not items:
+    if not os.getenv("GROQ_API_KEY") or not items:
         return items
     try:
-        import ollama  # pip install ollama
+        from groq import Groq  # pip install groq
     except ImportError:
-        print("  ! AI filter needs the ollama package (pip install ollama)", file=sys.stderr)
+        print("  ! AI filter configured but groq not installed", file=sys.stderr)
         return items
 
+    client = Groq()
     kept = []
     for start in range(0, len(items), 40):
         chunk = items[start:start + 40]
@@ -253,12 +254,12 @@ def ai_news_filter(items: list) -> list:
             'Reply with ONLY a JSON object: {"keep": [list of integer indices]}'
         )
         try:
-            resp = ollama.chat(
-                model=OLLAMA_MODEL,
+            resp = client.chat.completions.create(
+                model=GROQ_MODEL,
+                max_tokens=300,
                 messages=[{"role": "user", "content": prompt}],
-                options={"num_predict": 300},
             )
-            text = resp["message"]["content"].strip().strip("`")
+            text = resp.choices[0].message.content.strip().strip("`")
             text = text[text.find("{"): text.rfind("}") + 1]
             keep_idx = set(json.loads(text).get("keep", []))
             kept += [chunk[i] for i in range(len(chunk)) if i in keep_idx]
@@ -273,22 +274,25 @@ def ai_news_filter(items: list) -> list:
 
 def maybe_tighten(items: list) -> list:
     """Optional. Rewrite blurbs to a uniform voice/length (mainly helps Reddit)."""
+    if not os.getenv("GROQ_API_KEY"):
+        return items
     try:
-        import ollama
+        from groq import Groq
     except ImportError:
         return items
+    client = Groq()
     for it in items:
         if not it["blurb"]:
             continue
         try:
-            resp = ollama.chat(
-                model=OLLAMA_MODEL,
+            resp = client.chat.completions.create(
+                model=GROQ_MODEL,
+                max_tokens=60,
                 messages=[{"role": "user", "content": (
                     "Rewrite as one neutral news blurb, max 20 words, just the facts. "
                     f"Return only the blurb:\n\n{it['title']} — {it['blurb']}")}],
-                options={"num_predict": 60},
             )
-            it["blurb"] = resp["message"]["content"].strip()
+            it["blurb"] = resp.choices[0].message.content.strip()
         except Exception:  # noqa: BLE001
             pass
     return items
@@ -478,8 +482,8 @@ def main():
         items = within_window(items, args.hours)   # drop stale items before the costly passes
         print(f"  within last {args.hours:g}h: {len(items)}")
         items = dedupe(items)
-        items = ai_news_filter(items)   # optional, uses local Ollama if available
-        items = maybe_tighten(items)    # optional, uses local Ollama if available
+        items = ai_news_filter(items)   # optional, gated on GROQ_API_KEY
+        items = maybe_tighten(items)    # optional, gated on GROQ_API_KEY
 
     items.sort(key=lambda x: x["date"], reverse=True)
     items = items[:MAX_ITEMS]
