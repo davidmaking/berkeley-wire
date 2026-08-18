@@ -322,7 +322,10 @@ def relative_time(when: dt.datetime) -> str:
 
 
 def build_html(items: list) -> str:
-    updated = dt.datetime.now().strftime("%b %-d, %-I:%M %p")
+    now = dt.datetime.now()
+    updated = now.strftime("%b %-d, %-I:%M %p")
+    volume = now.year - 2025
+    issue = now.timetuple().tm_yday
     sources, seen = [], set()
     for it in items:
         if it["source"] not in seen:
@@ -333,17 +336,18 @@ def build_html(items: list) -> str:
         for n, c in sources
     )
     cards = "".join(f"""
-      <article class="card">
+      <article class="card" style="--c:{it['color']}">
         <div class="meta">
-          <span class="src" style="--c:{it['color']}">{html.escape(it['source'])}</span>
+          <span class="src">{html.escape(it['source'])}</span>
+          <span class="dot">&middot;</span>
           <span class="time">{relative_time(it['date'])}</span>
         </div>
         <h2><a href="{html.escape(it['link'])}" target="_blank" rel="noopener">{html.escape(it['title'])}</a></h2>
         <p>{html.escape(it['blurb'])}</p>
       </article>""" for it in items)
     if not items:
-        cards = ('<p class="empty">Nothing new in this window yet. '
-                 'Widen it with <code>--hours</code> (e.g. <code>--hours 48</code>).</p>')
+        cards = ('<p class="empty">Nothing new in this edition. '
+                 'Widen the window with <code>--hours</code> (e.g. <code>--hours 48</code>).</p>')
 
     return f"""<!doctype html>
 <html lang="en">
@@ -353,47 +357,92 @@ def build_html(items: list) -> str:
 <title>Berkeley Wire</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root {{
-    --paper:#F4F5F2; --ink:#15181C; --muted:#6B7178; --line:#E2E3DD; --amber:#C8852C;
-    --display:'Space Grotesk', system-ui, sans-serif; --mono:'JetBrains Mono', ui-monospace, monospace;
+    --paper:#F2ECDC; --ink:#1C1712; --muted:#6E6152; --line:#D9CDAF; --flag:#A32B20;
+    --masthead:'Playfair Display', Georgia, serif;
+    --serif:'Source Serif 4', Georgia, serif;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
   }}
-  * {{ box-sizing:border-box; }}
-  body {{ margin:0; background:var(--paper); color:var(--ink); font-family:var(--display); -webkit-font-smoothing:antialiased; }}
+  * {{ box-sizing:border-box; min-width:0; }}
+  html, body {{ overflow-x:hidden; max-width:100%; }}
+  body {{
+    margin:0; background-color:var(--paper); color:var(--ink); font-family:var(--serif);
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(28,23,18,.05) 0.6px, transparent 0.6px);
+    background-size:3px 3px;
+  }}
   .wrap {{ max-width:760px; margin:0 auto; padding:0 20px 80px; }}
-  header {{ border-bottom:2px solid var(--ink); padding:34px 0 14px; margin-bottom:8px; }}
-  .ticker {{ font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:12px; margin-bottom:18px; }}
-  .ticker .live::before {{ content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--amber); margin-right:7px; vertical-align:middle; animation:pulse 2s infinite; }}
-  @keyframes pulse {{ 0%,100%{{opacity:1}} 50%{{opacity:.35}} }}
-  h1 {{ font-size:40px; font-weight:700; letter-spacing:-.02em; margin:0; line-height:1; }}
-  h1 span {{ color:var(--amber); }}
-  .legend {{ display:flex; flex-wrap:wrap; gap:14px; margin-top:16px; }}
-  .tag {{ font-family:var(--mono); font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }}
-  .tag i {{ width:9px; height:9px; border-radius:2px; display:inline-block; }}
-  .card {{ padding:22px 0; border-bottom:1px solid var(--line); }}
-  .meta {{ display:flex; align-items:center; gap:12px; margin-bottom:8px; }}
-  .src {{ font-family:var(--mono); font-size:10.5px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--c); border:1px solid var(--c); padding:2px 7px; border-radius:3px; }}
+  header {{ padding:28px 0 0; margin-bottom:10px; }}
+  .dateline {{
+    display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:10px;
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted);
+    padding-bottom:14px; border-bottom:1px solid var(--ink);
+  }}
+  .dateline .vol {{ text-align:center; white-space:nowrap; }}
+  .dateline .updated {{ text-align:right; overflow-wrap:break-word; }}
+  .dateline .live {{ overflow-wrap:break-word; }}
+  .dateline .live::before {{
+    content:""; display:inline-block; width:6px; height:6px; border-radius:50%;
+    background:var(--flag); margin-right:6px; vertical-align:middle; animation:pulse 2s infinite;
+  }}
+  @keyframes pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:.3; }} }}
+  h1.masthead {{
+    font-family:var(--masthead); font-weight:900; text-align:center;
+    font-size:clamp(46px, 9vw, 84px); letter-spacing:-.01em; line-height:.95;
+    margin:20px 0 6px; text-transform:uppercase;
+  }}
+  h1.masthead span {{ color:var(--flag); font-style:italic; }}
+  .subhead {{
+    text-align:center; font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:16px;
+  }}
+  .rules {{ margin-bottom:16px; }}
+  .rule-thick {{ height:4px; background:var(--ink); margin-bottom:3px; }}
+  .rule-thin {{ height:1px; background:var(--ink); }}
+  .legend {{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px 18px; margin-bottom:26px; }}
+  .tag {{ font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:6px; }}
+  .tag i {{ width:8px; height:8px; display:inline-block; }}
+  .card {{ padding:22px 0 22px 18px; border-bottom:1px solid var(--line); border-left:3px solid var(--c); }}
+  .card:first-of-type {{ padding-top:6px; }}
+  .meta {{ display:flex; align-items:center; gap:8px; margin-bottom:9px; }}
+  .src {{
+    font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--c); border:1.5px solid var(--c); padding:2px 7px;
+  }}
+  .dot {{ color:var(--line); }}
   .time {{ font-family:var(--mono); font-size:11px; color:var(--muted); }}
-  h2 {{ font-size:20px; font-weight:500; line-height:1.25; margin:0 0 6px; letter-spacing:-.01em; }}
+  h2 {{ font-family:var(--serif); font-size:23px; font-weight:700; line-height:1.22; margin:0 0 8px; letter-spacing:-.01em; }}
   h2 a {{ color:var(--ink); text-decoration:none; }}
-  h2 a:hover {{ color:var(--amber); }}
-  .card p {{ margin:0; color:var(--muted); font-size:15px; line-height:1.5; }}
-  .empty {{ color:var(--muted); font-size:15px; padding:40px 0; }}
-  .empty code {{ font-family:var(--mono); font-size:13px; background:#E9EAE4; padding:1px 5px; border-radius:3px; }}
-  footer {{ font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:30px; }}
-  @media (prefers-reduced-motion:reduce) {{ .ticker .live::before {{ animation:none; }} }}
+  h2 a:hover {{ color:var(--flag); text-decoration:underline solid var(--flag) 2px; text-underline-offset:3px; }}
+  .card p {{ margin:0; color:var(--muted); font-size:16px; line-height:1.55; }}
+  .card:first-of-type p::first-letter {{
+    font-family:var(--masthead); font-weight:900; font-size:2.5em; float:left;
+    line-height:.8; padding:3px 6px 0 0; color:var(--flag);
+  }}
+  .empty {{ color:var(--muted); font-size:16px; padding:40px 18px; font-style:italic; }}
+  .empty code {{ font-family:var(--mono); font-style:normal; font-size:13px; background:#E7DCC0; padding:1px 5px; }}
+  footer {{ margin-top:34px; padding-top:16px; border-top:1px solid var(--ink); font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:center; }}
+  @media (prefers-reduced-motion:reduce) {{ .dateline .live::before {{ animation:none; }} }}
+  @media (max-width:480px) {{ .dateline .vol {{ display:none; }} }}
 </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <div class="ticker"><span class="live">Berkeley local feed</span><span>Updated {updated}</span></div>
-      <h1>Berkeley <span>Wire</span></h1>
+      <div class="dateline">
+        <span class="live">Live Wire</span>
+        <span class="vol">Vol. {volume} &middot; No. {issue}</span>
+        <span class="updated">Updated {updated}</span>
+      </div>
+      <h1 class="masthead">Berkeley <span>Wire</span></h1>
+      <div class="subhead">Local news, wired hourly &middot; Berkeley, California</div>
+      <div class="rules"><div class="rule-thick"></div><div class="rule-thin"></div></div>
       <div class="legend">{legend}</div>
     </header>
     <main>{cards}</main>
-    <footer>{len(items)} stories · headlines link out to original sources</footer>
+    <footer>{len(items)} stories &middot; headlines link out to original sources</footer>
   </div>
 </body>
 </html>"""
