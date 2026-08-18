@@ -14,7 +14,7 @@ Optional add-ons (each off unless configured):
   - Reddit (r/berkeley):  set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET, pip install praw
   - AI news filter + blurb tidy:  set GROQ_API_KEY (free tier at https://console.groq.com),
                                    pip install groq
-                                   optionally set GROQ_MODEL (default: llama-3.1-8b-instant)
+                                   optionally set GROQ_MODEL (default: openai/gpt-oss-20b)
 
 How "actual news" is enforced (see FILTERING below):
   1. Newsroom RSS feeds are trusted, with a light URL-path exclude (opinion, etc.).
@@ -101,7 +101,7 @@ BLURB_WORDS = 28
 MAX_ITEMS = 60          # hard ceiling on cards (safety cap)
 MAX_AGE_HOURS = 24      # only show stories newer than this; override with --hours
 OUTPUT = "index.html"
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
 
 # ==========================================================================
@@ -256,7 +256,8 @@ def ai_news_filter(items: list) -> list:
         try:
             resp = client.chat.completions.create(
                 model=GROQ_MODEL,
-                max_tokens=300,
+                max_tokens=500,
+                reasoning_effort="low",
                 messages=[{"role": "user", "content": prompt}],
             )
             text = resp.choices[0].message.content.strip().strip("`")
@@ -287,7 +288,8 @@ def maybe_tighten(items: list) -> list:
         try:
             resp = client.chat.completions.create(
                 model=GROQ_MODEL,
-                max_tokens=60,
+                max_tokens=150,
+                reasoning_effort="low",
                 messages=[{"role": "user", "content": (
                     "Rewrite as one neutral news blurb, max 20 words, just the facts. "
                     f"Return only the blurb:\n\n{it['title']} — {it['blurb']}")}],
