@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Berkeley Wire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:#F4F5F2; --ink:#15181C; --muted:#6B7178; --line:#E2E3DD; --amber:#C8852C;
+    --display:'Space Grotesk', system-ui, sans-serif; --mono:'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--display); -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:760px; margin:0 auto; padding:0 20px 80px; }
+  header { border-bottom:2px solid var(--ink); padding:34px 0 14px; margin-bottom:8px; }
+  .ticker { font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  .ticker .live::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--amber); margin-right:7px; vertical-align:middle; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  h1 { font-size:40px; font-weight:700; letter-spacing:-.02em; margin:0; line-height:1; }
+  h1 span { color:var(--amber); }
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:16px; }
+  .tag { font-family:var(--mono); font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .tag i { width:9px; height:9px; border-radius:2px; display:inline-block; }
+  .card { padding:22px 0; border-bottom:1px solid var(--line); }
+  .meta { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  .src { font-family:var(--mono); font-size:10.5px; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--c); border:1px solid var(--c); padding:2px 7px; border-radius:3px; }
+  .time { font-family:var(--mono); font-size:11px; color:var(--muted); }
+  h2 { font-size:20px; font-weight:500; line-height:1.25; margin:0 0 6px; letter-spacing:-.01em; }
+  h2 a { color:var(--ink); text-decoration:none; }
+  h2 a:hover { color:var(--amber); }
+  .card p { margin:0; color:var(--muted); font-size:15px; line-height:1.5; }
+  .empty { color:var(--muted); font-size:15px; padding:40px 0; }
+  .empty code { font-family:var(--mono); font-size:13px; background:#E9EAE4; padding:1px 5px; border-radius:3px; }
+  footer { font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:30px; }
+  @media (prefers-reduced-motion:reduce) { .ticker .live::before { animation:none; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="ticker"><span class="live">Berkeley local feed</span><span>Updated Jun 12, 5:41 PM</span></div>
+      <h1>Berkeley <span>Wire</span></h1>
+      <div class="legend"><span class="tag"><i style="background:#B23A2E"></i>Berkeley Scanner</span><span class="tag"><i style="background:#2E7D6F"></i>Berkeleyside</span><span class="tag"><i style="background:#4B2E83"></i>Berkeley News</span></div>
+    </header>
+    <main>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#B23A2E">Berkeley Scanner</span>
+          <span class="time">50m ago</span>
+        </div>
+        <h2><a href="https://www.berkeleyscanner.com/2026/06/12/community/dog-seizure-preceded-berkeley-animal-shelter-fire/" target="_blank" rel="noopener">Dog seizure preceded Berkeley Animal Shelter fire</a></h2>
+        <p>After the fire, police say arson suspect Peter Taraba flooded the shelter and then flooded the toilet in his Berkeley jail cell.</p>
+      </article>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#2E7D6F">Berkeleyside</span>
+          <span class="time">5h ago</span>
+        </div>
+        <h2><a href="https://www.berkeleyside.org/2026/06/12/xocolate-malibus-burgers-koja-kitchen-84-viet-milyar" target="_blank" rel="noopener">Xocolate announces final day, plus Milyar, 84 Viet, and Malibu’s Burgers close</a></h2>
+        <p>A running list of restaurants that have recently closed in Berkeley, Oakland, Richmond, and beyond.</p>
+      </article>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#4B2E83">Berkeley News</span>
+          <span class="time">6h ago</span>
+        </div>
+        <h2><a href="https://news.berkeley.edu/2026/06/12/berkeley-talks-why-kids-need-awe/" target="_blank" rel="noopener">Berkeley Talks: Why kids need awe — and how puppets can help</a></h2>
+        <p>Creators of the new Jim Henson Company puppet special “Wowsabout” join researchers from UC Berkeley’s Greater Good Science Center to discuss the complex psychology of wonder as a…</p>
+      </article>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#B23A2E">Berkeley Scanner</span>
+          <span class="time">6h ago</span>
+        </div>
+        <h2><a href="https://www.berkeleyscanner.com/2026/06/12/uc-berkeley-crime/uc-berkeley-dead-body-west-circle/" target="_blank" rel="noopener">Dead body found at UC Berkeley</a></h2>
+        <p>Gardeners found the body while working on campus Friday at the West Circle, in the bushes on one of the main campus pathways.</p>
+      </article>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#2E7D6F">Berkeleyside</span>
+          <span class="time">7h ago</span>
+        </div>
+        <h2><a href="https://www.berkeleyside.org/2026/06/12/university-of-california-sat-act" target="_blank" rel="noopener">University of California to consider bringing back SAT, ACT requirement in admissions</a></h2>
+        <p>More than 1,400 University of California faculty have signed an open letter calling on the system to reinstate the exams as an admissions requirement for STEM students.</p>
+      </article>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#2E7D6F">Berkeleyside</span>
+          <span class="time">9h ago</span>
+        </div>
+        <h2><a href="https://www.berkeleyside.org/2026/06/12/new-bampfa-artwork-lives-outside-the-museum-on-crescent-lawn" target="_blank" rel="noopener">New BAMPFA artwork lives outside the museum, on Crescent Lawn</a></h2>
+        <p>Mark di Suvero&#x27;s &quot;Mamma Mobius&quot; joins a collection of large-scale public sculptures on campus.</p>
+      </article>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#2E7D6F">Berkeleyside</span>
+          <span class="time">10h ago</span>
+        </div>
+        <h2><a href="https://www.berkeleyside.org/2026/06/12/north-berkeley-mom-tiktok" target="_blank" rel="noopener">‘North Berkeley mom’ is taking off on TikTok. It all started at the Cheese Board</a></h2>
+        <p>Comedian Simona Ruzer is expertly parodying the archetype of the hippie-dippie, secretly wealthy Berkeley mom — even though her own mother would never say, “Take the credit card…</p>
+      </article>
+      <article class="card">
+        <div class="meta">
+          <span class="src" style="--c:#2E7D6F">Berkeleyside</span>
+          <span class="time">11h ago</span>
+        </div>
+        <h2><a href="https://www.berkeleyside.org/2026/06/12/pride-berkeley-lgbtq-2026" target="_blank" rel="noopener">Pride summer in Berkeley: 13 festivals, parades, concerts and events celebrating LGBTQ+ communities</a></h2>
+        <p>A queer film series at BAMPFA. Mortifying stories read aloud from teen journals. Heated Rivalry trivia. Quilt making. And Berkeley’s Pride festival, now in Civic Center Park.</p>
+      </article></main>
+    <footer>8 stories · headlines link out to original sources</footer>
+  </div>
+</body>
+</html>
