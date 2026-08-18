@@ -322,10 +322,6 @@ def relative_time(when: dt.datetime) -> str:
 
 
 def build_html(items: list) -> str:
-    now = dt.datetime.now()
-    updated = now.strftime("%b %-d, %-I:%M %p")
-    volume = now.year - 2025
-    issue = now.timetuple().tm_yday
     sources, seen = [], set()
     for it in items:
         if it["source"] not in seen:
@@ -374,30 +370,13 @@ def build_html(items: list) -> str:
     background-size:3px 3px;
   }}
   .wrap {{ max-width:760px; margin:0 auto; padding:0 20px 80px; }}
-  header {{ padding:28px 0 0; margin-bottom:10px; }}
-  .dateline {{
-    display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:10px;
-    font-family:var(--mono); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted);
-    padding-bottom:14px; border-bottom:1px solid var(--ink);
-  }}
-  .dateline .vol {{ text-align:center; white-space:nowrap; }}
-  .dateline .updated {{ text-align:right; overflow-wrap:break-word; }}
-  .dateline .live {{ overflow-wrap:break-word; }}
-  .dateline .live::before {{
-    content:""; display:inline-block; width:6px; height:6px; border-radius:50%;
-    background:var(--flag); margin-right:6px; vertical-align:middle; animation:pulse 2s infinite;
-  }}
-  @keyframes pulse {{ 0%,100% {{ opacity:1; }} 50% {{ opacity:.3; }} }}
+  header {{ padding:34px 0 0; margin-bottom:10px; }}
   h1.masthead {{
     font-family:var(--masthead); font-weight:900; text-align:center;
     font-size:clamp(46px, 9vw, 84px); letter-spacing:-.01em; line-height:.95;
-    margin:20px 0 6px; text-transform:uppercase;
+    margin:0 0 16px; text-transform:uppercase;
   }}
   h1.masthead span {{ color:var(--flag); font-style:italic; }}
-  .subhead {{
-    text-align:center; font-family:var(--mono); font-size:11px; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--muted); margin-bottom:16px;
-  }}
   .rules {{ margin-bottom:16px; }}
   .rule-thick {{ height:4px; background:var(--ink); margin-bottom:3px; }}
   .rule-thin {{ height:1px; background:var(--ink); }}
@@ -417,27 +396,15 @@ def build_html(items: list) -> str:
   h2 a {{ color:var(--ink); text-decoration:none; }}
   h2 a:hover {{ color:var(--flag); text-decoration:underline solid var(--flag) 2px; text-underline-offset:3px; }}
   .card p {{ margin:0; color:var(--muted); font-size:16px; line-height:1.55; }}
-  .card:first-of-type p::first-letter {{
-    font-family:var(--masthead); font-weight:900; font-size:2.5em; float:left;
-    line-height:.8; padding:3px 6px 0 0; color:var(--flag);
-  }}
   .empty {{ color:var(--muted); font-size:16px; padding:40px 18px; font-style:italic; }}
   .empty code {{ font-family:var(--mono); font-style:normal; font-size:13px; background:#E7DCC0; padding:1px 5px; }}
   footer {{ margin-top:34px; padding-top:16px; border-top:1px solid var(--ink); font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:center; }}
-  @media (prefers-reduced-motion:reduce) {{ .dateline .live::before {{ animation:none; }} }}
-  @media (max-width:480px) {{ .dateline .vol {{ display:none; }} }}
 </style>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <div class="dateline">
-        <span class="live">Live Wire</span>
-        <span class="vol">Vol. {volume} &middot; No. {issue}</span>
-        <span class="updated">Updated {updated}</span>
-      </div>
       <h1 class="masthead">Berkeley <span>Wire</span></h1>
-      <div class="subhead">Local news, wired hourly &middot; Berkeley, California</div>
       <div class="rules"><div class="rule-thick"></div><div class="rule-thin"></div></div>
       <div class="legend">{legend}</div>
     </header>
