@@ -10,6 +10,9 @@ to the originals. No database, no server.
   python3 berkeley_wire.py --demo      # render sample data (no network)
   python3 berkeley_wire.py --out _site/index.html   # write somewhere specific
 
+Config is loaded from a .env file if present (copy .env.example to .env and
+fill in your keys), or from real environment variables. pip install python-dotenv.
+
 Optional add-ons (each off unless configured):
   - Reddit (r/berkeley):  set REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET, pip install praw
   - AI news filter + blurb tidy:  set GROQ_API_KEY (free tier at https://console.groq.com),
@@ -33,6 +36,12 @@ import sys
 import tempfile
 
 import feedparser  # pip install feedparser
+
+try:
+    from dotenv import load_dotenv  # pip install python-dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 
 def _utcnow() -> dt.datetime:
