@@ -322,6 +322,9 @@ def relative_time(when: dt.datetime) -> str:
 
 
 def build_html(items: list) -> str:
+    utc_now = _utcnow()
+    updated_utc_iso = utc_now.isoformat() + "Z"
+    updated_fallback = utc_now.strftime("%b %-d, %-I:%M %p UTC")
     sources, seen = [], set()
     for it in items:
         if it["source"] not in seen:
@@ -371,6 +374,10 @@ def build_html(items: list) -> str:
   }}
   .wrap {{ max-width:760px; margin:0 auto; padding:0 20px 80px; }}
   header {{ padding:34px 0 0; margin-bottom:10px; }}
+  .updated-tag {{
+    text-align:center; font-family:var(--mono); font-size:9.5px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:14px;
+  }}
   h1.masthead {{
     font-family:var(--masthead); font-weight:900; text-align:center;
     font-size:clamp(46px, 9vw, 84px); letter-spacing:-.01em; line-height:.95;
@@ -404,6 +411,7 @@ def build_html(items: list) -> str:
 <body>
   <div class="wrap">
     <header>
+      <div class="updated-tag" id="updated-tag" data-utc="{updated_utc_iso}">Updated {updated_fallback}</div>
       <h1 class="masthead">Berkeley <span>Wire</span></h1>
       <div class="rules"><div class="rule-thick"></div><div class="rule-thin"></div></div>
       <div class="legend">{legend}</div>
@@ -411,6 +419,18 @@ def build_html(items: list) -> str:
     <main>{cards}</main>
     <footer>{len(items)} stories &middot; headlines link out to original sources</footer>
   </div>
+  <script>
+    (function () {{
+      var el = document.getElementById('updated-tag');
+      if (!el) return;
+      var d = new Date(el.dataset.utc);
+      if (isNaN(d.getTime())) return;
+      var text = d.toLocaleString(undefined, {{
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+      }});
+      el.textContent = 'Updated ' + text;
+    }})();
+  </script>
 </body>
 </html>"""
 
