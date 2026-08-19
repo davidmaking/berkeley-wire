@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Berkeley Wire — Archive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper:#F2ECDC; --ink:#1C1712; --muted:#6E6152; --line:#D9CDAF; --flag:#A32B20;
+    --masthead:'Playfair Display', Georgia, serif;
+    --serif:'Source Serif 4', Georgia, serif;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing:border-box; min-width:0; }
+  html, body { overflow-x:hidden; max-width:100%; }
+  body {
+    margin:0; background-color:var(--paper); color:var(--ink); font-family:var(--serif);
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(28,23,18,.05) 0.6px, transparent 0.6px);
+    background-size:3px 3px;
+  }
+  .wrap { max-width:760px; margin:0 auto; padding:0 20px 80px; }
+  header { padding:34px 0 0; margin-bottom:10px; }
+  .updated-tag {
+    text-align:center; font-family:var(--mono); font-size:9.5px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:14px;
+  }
+  h1.masthead {
+    font-family:var(--masthead); font-weight:900; text-align:center;
+    font-size:clamp(46px, 9vw, 84px); letter-spacing:-.01em; line-height:.95;
+    margin:0 0 16px; text-transform:uppercase;
+  }
+  h1.masthead span { color:var(--flag); font-style:italic; }
+  .rules { margin-bottom:16px; }
+  .rule-thick { height:4px; background:var(--ink); margin-bottom:3px; }
+  .rule-thin { height:1px; background:var(--ink); }
+  nav.top-links { text-align:center; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:20px; }
+  nav.top-links a { color:var(--muted); text-decoration:none; border-bottom:1px solid var(--line); padding-bottom:1px; }
+  nav.top-links a:hover { color:var(--flag); border-color:var(--flag); }
+  .legend { display:flex; flex-wrap:wrap; justify-content:center; gap:8px 18px; margin-bottom:26px; }
+  .tag { font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .tag i { width:8px; height:8px; display:inline-block; }
+  .card { padding:22px 0 22px 18px; border-bottom:1px solid var(--line); border-left:3px solid var(--c); }
+  .card:first-of-type { padding-top:6px; }
+  .meta { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+  .src {
+    font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--c); border:1.5px solid var(--c); padding:2px 7px;
+  }
+  .dot { color:var(--line); }
+  .time { font-family:var(--mono); font-size:11px; color:var(--muted); }
+  h2 { font-family:var(--serif); font-size:23px; font-weight:700; line-height:1.22; margin:0 0 8px; letter-spacing:-.01em; }
+  h2 a { color:var(--ink); text-decoration:none; }
+  h2 a:hover { color:var(--flag); text-decoration:underline solid var(--flag) 2px; text-underline-offset:3px; }
+  .card p { margin:0; color:var(--muted); font-size:16px; line-height:1.55; }
+  .empty { color:var(--muted); font-size:16px; padding:40px 18px; font-style:italic; }
+  .empty code { font-family:var(--mono); font-style:normal; font-size:13px; background:#E7DCC0; padding:1px 5px; }
+  footer { margin-top:34px; padding-top:16px; border-top:1px solid var(--ink); font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:center; }
+  .search-row { display:flex; gap:10px; margin-bottom:24px; }
+  .search-row input {
+    flex:1; font-family:var(--serif); font-size:16px; padding:10px 14px; border:1.5px solid var(--ink);
+    background:var(--paper); color:var(--ink); border-radius:0;
+  }
+  .search-row input:focus { outline:2px solid var(--flag); outline-offset:-1px; }
+  .month-chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:26px; }
+  .month-chip {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); border:1px solid var(--line); padding:4px 10px; background:none; cursor:pointer;
+  }
+  .month-chip:hover { color:var(--flag); border-color:var(--flag); }
+  .month-chip.active { color:var(--paper); background:var(--ink); border-color:var(--ink); }
+  .status-line { text-align:center; font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:20px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1 class="masthead">Berkeley <span>Wire</span></h1>
+      <div class="rules"><div class="rule-thick"></div><div class="rule-thin"></div></div>
+      <nav class="top-links"><a href="index.html">&larr; Back to Today</a></nav>
+      <div class="search-row">
+        <input id="search-input" type="text" placeholder="Search headlines, sources, topics…" autocomplete="off">
+      </div>
+      <div class="month-chips" id="month-chips"></div>
+      <div class="status-line" id="status-line">Loading archive…</div>
+    </header>
+    <main id="results"></main>
+    <footer>Berkeley Wire Archive &middot; headlines link out to original sources</footer>
+  </div>
+  <script>
+    (function () {
+      var mount = document.getElementById('results');
+      var chipsEl = document.getElementById('month-chips');
+      var searchEl = document.getElementById('search-input');
+      var statusEl = document.getElementById('status-line');
+      var monthCache = {};
+      var manifest = [];
+      var activeMonth = null;
+
+      function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : s;
+        return d.innerHTML;
+      }
+
+      function relTime(iso) {
+        var secs = (Date.now() - new Date(iso).getTime()) / 1000;
+        if (secs < 3600) return Math.max(0, Math.floor(secs / 60)) + 'm ago';
+        if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+        return Math.floor(secs / 86400) + 'd ago';
+      }
+
+      function render() {
+        var q = searchEl.value.trim().toLowerCase();
+        var months = activeMonth ? [activeMonth] : Object.keys(monthCache);
+        var items = [];
+        months.forEach(function (m) { items = items.concat(monthCache[m] || []); });
+        if (q) {
+          items = items.filter(function (it) {
+            return (it.title + ' ' + it.blurb + ' ' + it.source).toLowerCase().indexOf(q) !== -1;
+          });
+        }
+        items.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+        var total = items.length;
+        items = items.slice(0, 200);
+        if (!items.length) {
+          mount.innerHTML = '<p class="empty">No matching stories in what\'s loaded so far. '
+            + 'Try a different search, or load an older month below.</p>';
+        } else {
+          mount.innerHTML = items.map(function (it) {
+            return '<article class="card" style="--c:' + it.color + '">'
+              + '<div class="meta"><span class="src">' + escapeHtml(it.source) + '</span>'
+              + '<span class="dot">&middot;</span><span class="time">' + relTime(it.date) + '</span></div>'
+              + '<h2><a href="' + escapeHtml(it.link) + '" target="_blank" rel="noopener">'
+              + escapeHtml(it.title) + '</a></h2>'
+              + '<p>' + escapeHtml(it.blurb) + '</p></article>';
+          }).join('');
+        }
+        var loadedCount = Object.keys(monthCache).length;
+        var shown = total > 200 ? '200 of ' + total : String(total);
+        statusEl.textContent = shown + ' shown · ' + loadedCount + ' of ' + manifest.length + ' months loaded';
+      }
+
+      function loadMonth(month) {
+        if (monthCache[month]) return Promise.resolve();
+        return fetch('data/' + month + '.json')
+          .then(function (r) { return r.json(); })
+          .then(function (data) { monthCache[month] = data; })
+          .catch(function () { monthCache[month] = []; });
+      }
+
+      function renderChips() {
+        var chips = manifest.map(function (m) {
+          var cls = 'month-chip' + (activeMonth === m.month ? ' active' : '');
+          return '<button class="' + cls + '" data-month="' + m.month + '">'
+            + m.month + ' (' + m.count + ')</button>';
+        });
+        chips.push('<button class="month-chip' + (activeMonth === null ? ' active' : '')
+          + '" data-month="">All loaded</button>');
+        chipsEl.innerHTML = chips.join('');
+      }
+
+      chipsEl.addEventListener('click', function (e) {
+        var btn = e.target.closest('.month-chip');
+        if (!btn) return;
+        var month = btn.dataset.month || null;
+        activeMonth = month;
+        renderChips();
+        if (month && !monthCache[month]) {
+          statusEl.textContent = 'Loading ' + month + '…';
+          loadMonth(month).then(render);
+        } else {
+          render();
+        }
+      });
+
+      searchEl.addEventListener('input', render);
+
+      fetch('data/index.json')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          manifest = data;
+          renderChips();
+          var toLoad = manifest.slice(0, 2).map(function (m) { return m.month; });
+          Promise.all(toLoad.map(loadMonth)).then(render);
+        })
+        .catch(function () {
+          statusEl.textContent = 'Could not load the archive index.';
+        });
+    })();
+  </script>
+</body>
+</html>
