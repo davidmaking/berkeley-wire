@@ -5,11 +5,6 @@ on:
     - cron: "0 * * * *"   # every hour
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -17,8 +12,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: archive-data
+          path: archive-data
 
       - uses: actions/setup-python@v5
         with:
@@ -26,11 +28,33 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - run: python3 berkeley_wire.py --out _site/index.html
+      - run: python3 berkeley_wire.py --out _site/index.html --archive-dir archive-data
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+
+      - name: Copy archive into the Pages build
+        run: |
+          mkdir -p _site/data
+          cp -r archive-data/data/. _site/data/
+          cp archive-data/archive.html _site/archive.html
+
+      - name: Commit archive
+        if: always()
+        continue-on-error: true
+        working-directory: archive-data
+        run: |
+          git config user.name "berkeley-wire-bot"
+          git config user.email "actions@github.com"
+          git add data archive.html
+          if git diff --cached --quiet; then
+            echo "No archive changes to commit"
+          else
+            git commit -m "Update archive"
+            git pull --rebase origin archive-data
+            git push origin archive-data
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -39,6 +63,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
