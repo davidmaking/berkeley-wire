@@ -59,7 +59,7 @@ def _utcfromts(ts: float) -> dt.datetime:
 # trusted; type="social" feeds (Reddit) get heavier filtering. If a feed URL
 # 404s or changes, the script skips it and keeps going.
 SOURCES = [
-    {"name": "Daily Cal",        "url": "https://www.dailycal.org/feed",        "color": "#1B3A6B", "type": "news"},
+    {"name": "Daily Cal",        "url": "https://www.dailycal.org/search/?f=rss&t=article&l=50&s=start_time&sd=desc", "color": "#1B3A6B", "type": "news"},
     {"name": "Berkeleyside",     "url": "https://www.berkeleyside.org/feed",    "color": "#2E7D6F", "type": "news"},
     {"name": "Berkeley Scanner", "url": "https://www.berkeleyscanner.com/rss",  "color": "#B23A2E", "type": "news"},
     {"name": "Berkeley News",    "url": "https://news.berkeley.edu/feed",       "color": "#4B2E83", "type": "news"},
