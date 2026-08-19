@@ -147,6 +147,10 @@ FEED_HEADERS = {"User-Agent": "BerkeleyWire/1.0 (+https://github.com/davidmaking
 def fetch_rss(source: dict) -> list:
     try:
         feed = feedparser.parse(source["url"], request_headers=FEED_HEADERS)
+        status = feed.get("status")
+        if status and status >= 400:
+            print(f"  ! skipped {source['name']}: HTTP {status}", file=sys.stderr)
+            return []
         items = []
         for e in feed.entries:
             title = clean_blurb(e.get("title", ""), max_words=20)
