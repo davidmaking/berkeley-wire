@@ -262,10 +262,13 @@ def ai_news_filter(items: list) -> list:
         prompt = (
             "Below are items from Berkeley-area feeds. Return the indices that are "
             "ACTUAL NEWS of public interest — crime/safety, local government, the "
-            "university as an institution, development, public health, courts, or "
-            "notable local events. EXCLUDE personal questions, advice or "
-            "recommendation requests, opinion/editorial, memes, promotions, "
-            "housing-wanted posts, and routine event listings.\n\n"
+            "university as an institution (including its research findings and "
+            "administrative decisions), development, public health, courts, public "
+            "services and benefits, notable local events, or business/community "
+            "happenings with real impact (openings, closures, major changes). "
+            "EXCLUDE personal questions, advice or recommendation requests, "
+            "opinion/editorial, memes, quizzes, listicles, lifestyle fluff, "
+            "promotions, housing-wanted posts, and routine event listings.\n\n"
             f"{listing}\n\n"
             'Reply with ONLY a JSON object: {"keep": [list of integer indices]}'
         )
