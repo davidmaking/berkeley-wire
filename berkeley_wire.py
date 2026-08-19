@@ -34,6 +34,7 @@ import os
 import re
 import sys
 import tempfile
+import urllib.parse
 
 import feedparser  # pip install feedparser
 
@@ -109,6 +110,9 @@ NEWS_DOMAINS = (
 BLURB_WORDS = 28
 MAX_ITEMS = 60          # hard ceiling on cards (safety cap)
 MAX_AGE_HOURS = 24      # only show stories newer than this; override with --hours
+ARCHIVE_LOOKBACK_HOURS = 48   # window used to gather archive candidates (wider than
+                               # the display window, so a missed/delayed run can't
+                               # silently create a permanent hole in the archive)
 OUTPUT = "index.html"
 GROQ_MODEL = os.getenv("GROQ_MODEL") or "openai/gpt-oss-20b"
 
@@ -320,8 +324,150 @@ def maybe_tighten(items: list) -> list:
 
 
 # ==========================================================================
+# Archive (persistent, searchable history)
+# ==========================================================================
+def normalize_link(url: str) -> str:
+    """Canonical form of a link, used only as the cross-run dedupe key.
+
+    Strips query string/fragment and a trailing slash so the same article
+    re-served across hourly fetches (sometimes with drifting tracking
+    params) is recognized as one item. The original, unmodified link is
+    what's stored/displayed -- this is never shown to a reader.
+    """
+    parts = urllib.parse.urlsplit(url.strip().lower())
+    path = parts.path.rstrip("/") or "/"
+    return f"{parts.scheme}://{parts.netloc}{path}"
+
+
+def month_key(when: dt.datetime) -> str:
+    return when.strftime("%Y-%m")
+
+
+def load_archive_shards(shards_dir: str) -> dict:
+    """Load every YYYY-MM.json shard file directly inside shards_dir into {month: [items]}."""
+    shards = {}
+    if not os.path.isdir(shards_dir):
+        return shards
+    for name in os.listdir(shards_dir):
+        if not re.fullmatch(r"\d{4}-\d{2}\.json", name):
+            continue
+        month = name[:-5]
+        with open(os.path.join(shards_dir, name), encoding="utf-8") as f:
+            raw_items = json.load(f)
+        for it in raw_items:
+            it["date"] = dt.datetime.fromisoformat(it["date"].rstrip("Z"))
+        shards[month] = raw_items
+    return shards
+
+
+def merge_into_archive(shards: dict, new_items: list) -> tuple:
+    """Add new_items into shards, deduped by normalize_link across the WHOLE
+    archive (not just this run). Returns (shards, number_actually_added)."""
+    seen = {normalize_link(it["link"]) for month_items in shards.values() for it in month_items}
+    added = 0
+    for it in new_items:
+        key = normalize_link(it["link"])
+        if key in seen:
+            continue
+        seen.add(key)
+        shards.setdefault(month_key(it["date"]), []).append(it)
+        added += 1
+    return shards, added
+
+
+def write_archive_shards(shards_dir: str, shards: dict) -> None:
+    """Write each month's shard back to disk and rebuild the index.json manifest."""
+    os.makedirs(shards_dir, exist_ok=True)
+    manifest = []
+    for month in sorted(shards.keys()):
+        items = sorted(shards[month], key=lambda x: x["date"], reverse=True)
+        path = os.path.join(shards_dir, f"{month}.json")
+        payload = [{**it, "date": it["date"].isoformat() + "Z"} for it in items]
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+        dates = [it["date"] for it in items]
+        manifest.append({
+            "month": month, "count": len(items),
+            "first_date": min(dates).isoformat() + "Z",
+            "last_date": max(dates).isoformat() + "Z",
+        })
+    manifest.sort(key=lambda m: m["month"], reverse=True)
+    with open(os.path.join(shards_dir, "index.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, separators=(",", ":"))
+
+
+# ==========================================================================
 # Render
 # ==========================================================================
+PAGE_CSS = """
+  :root {
+    --paper:#F2ECDC; --ink:#1C1712; --muted:#6E6152; --line:#D9CDAF; --flag:#A32B20;
+    --masthead:'Playfair Display', Georgia, serif;
+    --serif:'Source Serif 4', Georgia, serif;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { box-sizing:border-box; min-width:0; }
+  html, body { overflow-x:hidden; max-width:100%; }
+  body {
+    margin:0; background-color:var(--paper); color:var(--ink); font-family:var(--serif);
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(28,23,18,.05) 0.6px, transparent 0.6px);
+    background-size:3px 3px;
+  }
+  .wrap { max-width:760px; margin:0 auto; padding:0 20px 80px; }
+  header { padding:34px 0 0; margin-bottom:10px; }
+  .updated-tag {
+    text-align:center; font-family:var(--mono); font-size:9.5px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:14px;
+  }
+  h1.masthead {
+    font-family:var(--masthead); font-weight:900; text-align:center;
+    font-size:clamp(46px, 9vw, 84px); letter-spacing:-.01em; line-height:.95;
+    margin:0 0 16px; text-transform:uppercase;
+  }
+  h1.masthead span { color:var(--flag); font-style:italic; }
+  .rules { margin-bottom:16px; }
+  .rule-thick { height:4px; background:var(--ink); margin-bottom:3px; }
+  .rule-thin { height:1px; background:var(--ink); }
+  nav.top-links { text-align:center; font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:20px; }
+  nav.top-links a { color:var(--muted); text-decoration:none; border-bottom:1px solid var(--line); padding-bottom:1px; }
+  nav.top-links a:hover { color:var(--flag); border-color:var(--flag); }
+  .legend { display:flex; flex-wrap:wrap; justify-content:center; gap:8px 18px; margin-bottom:26px; }
+  .tag { font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .tag i { width:8px; height:8px; display:inline-block; }
+  .card { padding:22px 0 22px 18px; border-bottom:1px solid var(--line); border-left:3px solid var(--c); }
+  .card:first-of-type { padding-top:6px; }
+  .meta { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+  .src {
+    font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--c); border:1.5px solid var(--c); padding:2px 7px;
+  }
+  .dot { color:var(--line); }
+  .time { font-family:var(--mono); font-size:11px; color:var(--muted); }
+  h2 { font-family:var(--serif); font-size:23px; font-weight:700; line-height:1.22; margin:0 0 8px; letter-spacing:-.01em; }
+  h2 a { color:var(--ink); text-decoration:none; }
+  h2 a:hover { color:var(--flag); text-decoration:underline solid var(--flag) 2px; text-underline-offset:3px; }
+  .card p { margin:0; color:var(--muted); font-size:16px; line-height:1.55; }
+  .empty { color:var(--muted); font-size:16px; padding:40px 18px; font-style:italic; }
+  .empty code { font-family:var(--mono); font-style:normal; font-size:13px; background:#E7DCC0; padding:1px 5px; }
+  footer { margin-top:34px; padding-top:16px; border-top:1px solid var(--ink); font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:center; }
+  .search-row { display:flex; gap:10px; margin-bottom:24px; }
+  .search-row input {
+    flex:1; font-family:var(--serif); font-size:16px; padding:10px 14px; border:1.5px solid var(--ink);
+    background:var(--paper); color:var(--ink); border-radius:0;
+  }
+  .search-row input:focus { outline:2px solid var(--flag); outline-offset:-1px; }
+  .month-chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:26px; }
+  .month-chip {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); border:1px solid var(--line); padding:4px 10px; background:none; cursor:pointer;
+  }
+  .month-chip:hover { color:var(--flag); border-color:var(--flag); }
+  .month-chip.active { color:var(--paper); background:var(--ink); border-color:var(--ink); }
+  .status-line { text-align:center; font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:20px; }
+"""
+
+
 def relative_time(when: dt.datetime) -> str:
     secs = (_utcnow() - when).total_seconds()
     if secs < 3600:
@@ -367,56 +513,7 @@ def build_html(items: list) -> str:
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-  :root {{
-    --paper:#F2ECDC; --ink:#1C1712; --muted:#6E6152; --line:#D9CDAF; --flag:#A32B20;
-    --masthead:'Playfair Display', Georgia, serif;
-    --serif:'Source Serif 4', Georgia, serif;
-    --mono:'JetBrains Mono', ui-monospace, monospace;
-  }}
-  * {{ box-sizing:border-box; min-width:0; }}
-  html, body {{ overflow-x:hidden; max-width:100%; }}
-  body {{
-    margin:0; background-color:var(--paper); color:var(--ink); font-family:var(--serif);
-    -webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(rgba(28,23,18,.05) 0.6px, transparent 0.6px);
-    background-size:3px 3px;
-  }}
-  .wrap {{ max-width:760px; margin:0 auto; padding:0 20px 80px; }}
-  header {{ padding:34px 0 0; margin-bottom:10px; }}
-  .updated-tag {{
-    text-align:center; font-family:var(--mono); font-size:9.5px; letter-spacing:.08em;
-    text-transform:uppercase; color:var(--muted); margin-bottom:14px;
-  }}
-  h1.masthead {{
-    font-family:var(--masthead); font-weight:900; text-align:center;
-    font-size:clamp(46px, 9vw, 84px); letter-spacing:-.01em; line-height:.95;
-    margin:0 0 16px; text-transform:uppercase;
-  }}
-  h1.masthead span {{ color:var(--flag); font-style:italic; }}
-  .rules {{ margin-bottom:16px; }}
-  .rule-thick {{ height:4px; background:var(--ink); margin-bottom:3px; }}
-  .rule-thin {{ height:1px; background:var(--ink); }}
-  .legend {{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px 18px; margin-bottom:26px; }}
-  .tag {{ font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:6px; }}
-  .tag i {{ width:8px; height:8px; display:inline-block; }}
-  .card {{ padding:22px 0 22px 18px; border-bottom:1px solid var(--line); border-left:3px solid var(--c); }}
-  .card:first-of-type {{ padding-top:6px; }}
-  .meta {{ display:flex; align-items:center; gap:8px; margin-bottom:9px; }}
-  .src {{
-    font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
-    color:var(--c); border:1.5px solid var(--c); padding:2px 7px;
-  }}
-  .dot {{ color:var(--line); }}
-  .time {{ font-family:var(--mono); font-size:11px; color:var(--muted); }}
-  h2 {{ font-family:var(--serif); font-size:23px; font-weight:700; line-height:1.22; margin:0 0 8px; letter-spacing:-.01em; }}
-  h2 a {{ color:var(--ink); text-decoration:none; }}
-  h2 a:hover {{ color:var(--flag); text-decoration:underline solid var(--flag) 2px; text-underline-offset:3px; }}
-  .card p {{ margin:0; color:var(--muted); font-size:16px; line-height:1.55; }}
-  .empty {{ color:var(--muted); font-size:16px; padding:40px 18px; font-style:italic; }}
-  .empty code {{ font-family:var(--mono); font-style:normal; font-size:13px; background:#E7DCC0; padding:1px 5px; }}
-  footer {{ margin-top:34px; padding-top:16px; border-top:1px solid var(--ink); font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:center; }}
-</style>
+<style>{PAGE_CSS}</style>
 </head>
 <body>
   <div class="wrap">
@@ -424,6 +521,7 @@ def build_html(items: list) -> str:
       <div class="updated-tag" id="updated-tag" data-utc="{updated_utc_iso}">Updated {updated_fallback}</div>
       <h1 class="masthead">Berkeley <span>Wire</span></h1>
       <div class="rules"><div class="rule-thick"></div><div class="rule-thin"></div></div>
+      <nav class="top-links"><a href="archive.html">Search the Archive</a></nav>
       <div class="legend">{legend}</div>
     </header>
     <main>{cards}</main>
@@ -443,6 +541,144 @@ def build_html(items: list) -> str:
   </script>
 </body>
 </html>"""
+
+
+ARCHIVE_HTML_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Berkeley Wire — Archive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>__PAGE_CSS__</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1 class="masthead">Berkeley <span>Wire</span></h1>
+      <div class="rules"><div class="rule-thick"></div><div class="rule-thin"></div></div>
+      <nav class="top-links"><a href="index.html">&larr; Back to Today</a></nav>
+      <div class="search-row">
+        <input id="search-input" type="text" placeholder="Search headlines, sources, topics…" autocomplete="off">
+      </div>
+      <div class="month-chips" id="month-chips"></div>
+      <div class="status-line" id="status-line">Loading archive…</div>
+    </header>
+    <main id="results"></main>
+    <footer>Berkeley Wire Archive &middot; headlines link out to original sources</footer>
+  </div>
+  <script>
+    (function () {
+      var mount = document.getElementById('results');
+      var chipsEl = document.getElementById('month-chips');
+      var searchEl = document.getElementById('search-input');
+      var statusEl = document.getElementById('status-line');
+      var monthCache = {};
+      var manifest = [];
+      var activeMonth = null;
+
+      function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : s;
+        return d.innerHTML;
+      }
+
+      function relTime(iso) {
+        var secs = (Date.now() - new Date(iso).getTime()) / 1000;
+        if (secs < 3600) return Math.max(0, Math.floor(secs / 60)) + 'm ago';
+        if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+        return Math.floor(secs / 86400) + 'd ago';
+      }
+
+      function render() {
+        var q = searchEl.value.trim().toLowerCase();
+        var months = activeMonth ? [activeMonth] : Object.keys(monthCache);
+        var items = [];
+        months.forEach(function (m) { items = items.concat(monthCache[m] || []); });
+        if (q) {
+          items = items.filter(function (it) {
+            return (it.title + ' ' + it.blurb + ' ' + it.source).toLowerCase().indexOf(q) !== -1;
+          });
+        }
+        items.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+        var total = items.length;
+        items = items.slice(0, 200);
+        if (!items.length) {
+          mount.innerHTML = '<p class="empty">No matching stories in what\\'s loaded so far. '
+            + 'Try a different search, or load an older month below.</p>';
+        } else {
+          mount.innerHTML = items.map(function (it) {
+            return '<article class="card" style="--c:' + it.color + '">'
+              + '<div class="meta"><span class="src">' + escapeHtml(it.source) + '</span>'
+              + '<span class="dot">&middot;</span><span class="time">' + relTime(it.date) + '</span></div>'
+              + '<h2><a href="' + escapeHtml(it.link) + '" target="_blank" rel="noopener">'
+              + escapeHtml(it.title) + '</a></h2>'
+              + '<p>' + escapeHtml(it.blurb) + '</p></article>';
+          }).join('');
+        }
+        var loadedCount = Object.keys(monthCache).length;
+        var shown = total > 200 ? '200 of ' + total : String(total);
+        statusEl.textContent = shown + ' shown · ' + loadedCount + ' of ' + manifest.length + ' months loaded';
+      }
+
+      function loadMonth(month) {
+        if (monthCache[month]) return Promise.resolve();
+        return fetch('data/' + month + '.json')
+          .then(function (r) { return r.json(); })
+          .then(function (data) { monthCache[month] = data; })
+          .catch(function () { monthCache[month] = []; });
+      }
+
+      function renderChips() {
+        var chips = manifest.map(function (m) {
+          var cls = 'month-chip' + (activeMonth === m.month ? ' active' : '');
+          return '<button class="' + cls + '" data-month="' + m.month + '">'
+            + m.month + ' (' + m.count + ')</button>';
+        });
+        chips.push('<button class="month-chip' + (activeMonth === null ? ' active' : '')
+          + '" data-month="">All loaded</button>');
+        chipsEl.innerHTML = chips.join('');
+      }
+
+      chipsEl.addEventListener('click', function (e) {
+        var btn = e.target.closest('.month-chip');
+        if (!btn) return;
+        var month = btn.dataset.month || null;
+        activeMonth = month;
+        renderChips();
+        if (month && !monthCache[month]) {
+          statusEl.textContent = 'Loading ' + month + '…';
+          loadMonth(month).then(render);
+        } else {
+          render();
+        }
+      });
+
+      searchEl.addEventListener('input', render);
+
+      fetch('data/index.json')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          manifest = data;
+          renderChips();
+          var toLoad = manifest.slice(0, 2).map(function (m) { return m.month; });
+          Promise.all(toLoad.map(loadMonth)).then(render);
+        })
+        .catch(function () {
+          statusEl.textContent = 'Could not load the archive index.';
+        });
+    })();
+  </script>
+</body>
+</html>"""
+
+
+def build_archive_html() -> str:
+    """Static shell -- fetches data/index.json and month shards at runtime,
+    so this page never needs to be regenerated differently run to run."""
+    return ARCHIVE_HTML_TEMPLATE.replace("__PAGE_CSS__", PAGE_CSS)
 
 
 def write_output(path: str, content: str) -> str:
@@ -520,10 +756,14 @@ def main():
     ap.add_argument("--out", default=OUTPUT, help=f"output file path (default: {OUTPUT})")
     ap.add_argument("--hours", type=float, default=MAX_AGE_HOURS,
                     help=f"only show stories from the last N hours (default: {MAX_AGE_HOURS}; 0 = no limit)")
+    ap.add_argument("--archive-dir", default=None,
+                    help="persist stories into a searchable archive at this directory "
+                         "(writes data/YYYY-MM.json shards + archive.html); off by default")
     args = ap.parse_args()
 
     if args.demo:
-        items = within_window(DEMO_ITEMS, args.hours)
+        archive_candidates = within_window(DEMO_ITEMS, args.hours)
+        items = archive_candidates
     else:
         items = []
         print("Pulling feeds…")
@@ -536,17 +776,32 @@ def main():
             print(f"  r/{REDDIT['subreddit']}: {len(rd)} (after filter)")
         items += rd
 
-        items = within_window(items, args.hours)   # drop stale items before the costly passes
-        print(f"  within last {args.hours:g}h: {len(items)}")
-        items = dedupe(items)
-        items = ai_news_filter(items)   # optional, gated on GROQ_API_KEY
-        items = maybe_tighten(items)    # optional, gated on GROQ_API_KEY
+        # Gather archive candidates over a WIDER window than what's displayed
+        # today, so a missed hourly run can't quietly erase stories from the
+        # archive forever (RSS feeds don't offer historical backfill).
+        lookback = max(args.hours, ARCHIVE_LOOKBACK_HOURS)
+        archive_candidates = within_window(items, lookback)
+        print(f"  within last {lookback:g}h: {len(archive_candidates)}")
+        archive_candidates = dedupe(archive_candidates)
+        archive_candidates = ai_news_filter(archive_candidates)   # optional, gated on GROQ_API_KEY
+        archive_candidates = maybe_tighten(archive_candidates)    # optional, gated on GROQ_API_KEY
+
+        items = within_window(archive_candidates, args.hours)   # narrow to today's display window
 
     items.sort(key=lambda x: x["date"], reverse=True)
     items = items[:MAX_ITEMS]
 
     written = write_output(args.out, build_html(items))
     print(f"Wrote {written} ({len(items)} stories)")
+
+    if args.archive_dir:
+        shards_dir = os.path.join(args.archive_dir, "data")
+        shards = load_archive_shards(shards_dir)
+        shards, added = merge_into_archive(shards, archive_candidates)
+        write_archive_shards(shards_dir, shards)
+        archive_html_path = write_output(
+            os.path.join(args.archive_dir, "archive.html"), build_archive_html())
+        print(f"Archived {added} new stories; wrote {archive_html_path}")
 
 
 if __name__ == "__main__":
