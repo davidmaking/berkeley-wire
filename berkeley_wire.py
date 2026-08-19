@@ -110,7 +110,7 @@ BLURB_WORDS = 28
 MAX_ITEMS = 60          # hard ceiling on cards (safety cap)
 MAX_AGE_HOURS = 24      # only show stories newer than this; override with --hours
 OUTPUT = "index.html"
-GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+GROQ_MODEL = os.getenv("GROQ_MODEL") or "openai/gpt-oss-20b"
 
 
 # ==========================================================================
@@ -141,9 +141,12 @@ def url_is_news(link: str) -> bool:
     return not any(part in low for part in EXCLUDE_URL_PARTS)
 
 
+FEED_HEADERS = {"User-Agent": "BerkeleyWire/1.0 (+https://github.com/davidmaking/berkeley-wire)"}
+
+
 def fetch_rss(source: dict) -> list:
     try:
-        feed = feedparser.parse(source["url"])
+        feed = feedparser.parse(source["url"], request_headers=FEED_HEADERS)
         items = []
         for e in feed.entries:
             title = clean_blurb(e.get("title", ""), max_words=20)
