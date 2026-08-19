@@ -451,12 +451,23 @@ PAGE_CSS = """
   .empty { color:var(--muted); font-size:16px; padding:40px 18px; font-style:italic; }
   .empty code { font-family:var(--mono); font-style:normal; font-size:13px; background:#E7DCC0; padding:1px 5px; }
   footer { margin-top:34px; padding-top:16px; border-top:1px solid var(--ink); font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); text-align:center; }
-  .search-row { display:flex; gap:10px; margin-bottom:24px; }
-  .search-row input {
-    flex:1; font-family:var(--serif); font-size:16px; padding:10px 14px; border:1.5px solid var(--ink);
+  .search-row { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:24px; }
+  .search-row input[type="text"] {
+    flex:1; min-width:180px; font-family:var(--serif); font-size:16px; padding:10px 14px;
+    border:1.5px solid var(--ink); background:var(--paper); color:var(--ink); border-radius:0;
+  }
+  .search-row input[type="date"] {
+    font-family:var(--mono); font-size:14px; padding:10px; border:1.5px solid var(--ink);
     background:var(--paper); color:var(--ink); border-radius:0;
   }
   .search-row input:focus { outline:2px solid var(--flag); outline-offset:-1px; }
+  .clear-date {
+    font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); background:none; border:1.5px solid var(--line); padding:0 12px; cursor:pointer;
+    display:none;
+  }
+  .clear-date.visible { display:inline-block; }
+  .clear-date:hover { color:var(--flag); border-color:var(--flag); }
   .month-chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:26px; }
   .month-chip {
     font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
@@ -562,6 +573,8 @@ ARCHIVE_HTML_TEMPLATE = """<!doctype html>
       <nav class="top-links"><a href="index.html">&larr; Back to Today</a></nav>
       <div class="search-row">
         <input id="search-input" type="text" placeholder="Search headlines, sources, topics…" autocomplete="off">
+        <input id="date-input" type="date">
+        <button id="clear-date" class="clear-date" type="button">Clear date</button>
       </div>
       <div class="month-chips" id="month-chips"></div>
       <div class="status-line" id="status-line">Loading archive…</div>
@@ -574,6 +587,8 @@ ARCHIVE_HTML_TEMPLATE = """<!doctype html>
       var mount = document.getElementById('results');
       var chipsEl = document.getElementById('month-chips');
       var searchEl = document.getElementById('search-input');
+      var dateEl = document.getElementById('date-input');
+      var clearDateEl = document.getElementById('clear-date');
       var statusEl = document.getElementById('status-line');
       var monthCache = {};
       var manifest = [];
@@ -592,11 +607,25 @@ ARCHIVE_HTML_TEMPLATE = """<!doctype html>
         return Math.floor(secs / 86400) + 'd ago';
       }
 
+      // Local (browser-timezone) calendar date, to match <input type="date">'s
+      // plain YYYY-MM-DD value and how relTime/the rest of the site reads as
+      // local time to a visitor.
+      function localDateKey(d) {
+        var mm = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + mm + '-' + dd;
+      }
+
       function render() {
         var q = searchEl.value.trim().toLowerCase();
+        var dateFilter = dateEl.value;
+        clearDateEl.classList.toggle('visible', !!dateFilter);
         var months = activeMonth ? [activeMonth] : Object.keys(monthCache);
         var items = [];
         months.forEach(function (m) { items = items.concat(monthCache[m] || []); });
+        if (dateFilter) {
+          items = items.filter(function (it) { return localDateKey(new Date(it.date)) === dateFilter; });
+        }
         if (q) {
           items = items.filter(function (it) {
             return (it.title + ' ' + it.blurb + ' ' + it.source).toLowerCase().indexOf(q) !== -1;
@@ -645,6 +674,7 @@ ARCHIVE_HTML_TEMPLATE = """<!doctype html>
       chipsEl.addEventListener('click', function (e) {
         var btn = e.target.closest('.month-chip');
         if (!btn) return;
+        dateEl.value = '';   // chips are a coarser nav mode; picking one drops any exact-date filter
         var month = btn.dataset.month || null;
         activeMonth = month;
         renderChips();
@@ -657,6 +687,25 @@ ARCHIVE_HTML_TEMPLATE = """<!doctype html>
       });
 
       searchEl.addEventListener('input', render);
+
+      dateEl.addEventListener('change', function () {
+        var val = dateEl.value;
+        if (!val) { render(); return; }
+        var month = val.slice(0, 7);
+        activeMonth = month;
+        renderChips();
+        if (!monthCache[month]) {
+          statusEl.textContent = 'Loading ' + month + '…';
+          loadMonth(month).then(render);
+        } else {
+          render();
+        }
+      });
+
+      clearDateEl.addEventListener('click', function () {
+        dateEl.value = '';
+        render();
+      });
 
       fetch('data/index.json')
         .then(function (r) { return r.json(); })
