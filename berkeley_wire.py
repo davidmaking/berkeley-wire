@@ -75,16 +75,20 @@ REDDIT = {
     "listing": "hot",      # hot | new | rising | top
     "limit": 25,           # pull this many, then filter down
     "color": "#FF4500",
-    "min_score": 25,       # ignore low-traction posts
-    "min_comments": 4,
+    "min_score": 40,       # ignore low-traction posts
+    "min_comments": 8,
 }
 
 # ---- FILTERING ----------------------------------------------------------
 # News feeds: drop items whose link path contains any of these. Tune freely —
 # remove "/arts" if you want arts coverage, add "/sports" stays out, etc.
+# "/news/national" excludes wire-service national stories (e.g. Daily Cal
+# reprints general national coverage there); state stories are left to the
+# AI filter since some ("UC Berkeley analysis blames state policy...") are
+# genuinely local and others aren't.
 EXCLUDE_URL_PARTS = [
     "/opinion", "/sponsored", "sponsored-post", "/classified",
-    "/sports", "/arts", "/podcast", "/comics", "/games/",
+    "/sports", "/arts", "/podcast", "/comics", "/games/", "/news/national",
 ]
 
 # Reddit: phrases that mark a post as a personal question / not news.
@@ -101,10 +105,12 @@ QUESTION_STARTS = (
     "does ", "can ", "should ", "could ", "would ", "anyone ", "any ", "need ",
 )
 # External links to these domains are treated as strong "this is news" signals.
+# Kept to outlets that report specifically on Berkeley/the university, not
+# broad regional or national wires (whose stories are rarely Berkeley-local
+# even when someone posts them to r/berkeley).
 NEWS_DOMAINS = (
     "berkeleyside.org", "berkeleyscanner.com", "dailycal.org", "news.berkeley.edu",
-    "oaklandside.org", "kqed.org", "sfchronicle.com", "sfgate.com", "mercurynews.com",
-    "eastbaytimes.com", "abc7news.com", "ktvu.com", "nbcbayarea.com", "apnews.com",
+    "oaklandside.org", "kqed.org",
 )
 
 BLURB_WORDS = 28
@@ -265,14 +271,20 @@ def ai_news_filter(items: list) -> list:
         listing = "\n".join(f"{i}. [{it['source']}] {it['title']}" for i, it in enumerate(chunk))
         prompt = (
             "Below are items from Berkeley-area feeds. Return the indices that are "
-            "ACTUAL NEWS of public interest — crime/safety, local government, the "
-            "university as an institution (including its research findings and "
-            "administrative decisions), development, public health, courts, public "
-            "services and benefits, notable local events, or business/community "
-            "happenings with real impact (openings, closures, major changes). "
-            "EXCLUDE personal questions, advice or recommendation requests, "
-            "opinion/editorial, memes, quizzes, listicles, lifestyle fluff, "
-            "promotions, housing-wanted posts, and routine event listings.\n\n"
+            "ACTUAL LOCAL/UNIVERSITY NEWS — meaning the story is specifically about "
+            "the City of Berkeley, UC Berkeley as an institution (research findings, "
+            "administrative decisions, campus life), or the immediate Berkeley "
+            "community: crime/safety, local government, development, public health, "
+            "courts, public services and benefits, notable local events, or "
+            "business/community happenings with real impact (openings, closures, "
+            "major changes). "
+            "EXCLUDE anything without a direct, specific Berkeley/UC Berkeley tie — "
+            "general California or national politics/policy stories that only "
+            "mention Berkeley in passing, statewide ballot measures or races without "
+            "a Berkeley-specific angle, wire-service national news, personal "
+            "questions, advice or recommendation requests, opinion/editorial, memes, "
+            "quizzes, listicles, lifestyle fluff, promotions, housing-wanted posts, "
+            "and routine event listings.\n\n"
             f"{listing}\n\n"
             'Reply with ONLY a JSON object: {"keep": [list of integer indices]}'
         )
