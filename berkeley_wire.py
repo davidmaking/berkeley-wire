@@ -89,6 +89,7 @@ REDDIT = {
 EXCLUDE_URL_PARTS = [
     "/opinion", "/sponsored", "sponsored-post", "/classified",
     "/sports", "/arts", "/podcast", "/comics", "/games/", "/news/national",
+    "/lifestyle",
 ]
 
 # Reddit: phrases that mark a post as a personal question / not news.
