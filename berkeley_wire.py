@@ -115,11 +115,11 @@ NEWS_DOMAINS = (
 )
 
 BLURB_WORDS = 28
-MAX_ITEMS = 60          # hard ceiling on cards (safety cap)
-MAX_AGE_HOURS = 24      # only show stories newer than this; override with --hours
-ARCHIVE_LOOKBACK_HOURS = 48   # window used to gather archive candidates (wider than
-                               # the display window, so a missed/delayed run can't
-                               # silently create a permanent hole in the archive)
+MAX_ITEMS = 150         # hard ceiling on cards (safety cap)
+MAX_AGE_HOURS = 24 * 7  # only show stories newer than this (1 week); override with --hours
+ARCHIVE_LOOKBACK_HOURS = 24 * 8   # window used to gather archive candidates (wider than
+                                   # the display window, so a missed/delayed run can't
+                                   # silently create a permanent hole in the archive)
 OUTPUT = "index.html"
 GROQ_MODEL = os.getenv("GROQ_MODEL") or "openai/gpt-oss-20b"
 
@@ -526,7 +526,7 @@ def build_html(items: list) -> str:
       </article>""" for it in items)
     if not items:
         cards = ('<p class="empty">Nothing new in this edition. '
-                 'Widen the window with <code>--hours</code> (e.g. <code>--hours 48</code>).</p>')
+                 'Widen the window with <code>--hours</code> (e.g. <code>--hours 336</code>).</p>')
 
     return f"""<!doctype html>
 <html lang="en">
@@ -804,11 +804,11 @@ DEMO_ITEMS = [
      "title": "City releases draft budget with cuts to several programs",
      "blurb": "The proposal trims funding for some community services amid a projected shortfall; council will take public comment next week.",
      "link": "https://www.dailycal.org/", "date": _utcnow() - dt.timedelta(hours=18)},
-    # ---- older than 24h: gets filtered out by the default window ----
+    # ---- older than a week: gets filtered out by the default window ----
     {"source": "Berkeleyside", "color": "#2E7D6F", "type": "news",
      "title": "Council approved parklet ordinance at last month's meeting",
-     "blurb": "This story is more than a day old and should be filtered out by the default 24-hour window.",
-     "link": "https://www.berkeleyside.org/", "date": _utcnow() - dt.timedelta(hours=30)},
+     "blurb": "This story is more than a week old and should be filtered out by the default window.",
+     "link": "https://www.berkeleyside.org/", "date": _utcnow() - dt.timedelta(hours=24 * 8)},
 ]
 
 
