@@ -2,7 +2,10 @@ name: Publish Berkeley Wire
 
 on:
   schedule:
-    - cron: "0 * * * *"   # every hour
+    # :17 avoids the top-of-hour spike, when GitHub's scheduler is most
+    # overloaded and silently drops/delays a large share of triggers
+    # (this repo was seeing ~3.5h average gaps instead of ~1h at "0 * * * *").
+    - cron: "17 * * * *"   # every hour
   workflow_dispatch: {}
 
 concurrency:
