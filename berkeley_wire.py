@@ -285,7 +285,12 @@ def ai_news_filter(items: list) -> list:
             "a Berkeley-specific angle, wire-service national news, personal "
             "questions, advice or recommendation requests, opinion/editorial, memes, "
             "quizzes, listicles, lifestyle fluff, promotions, housing-wanted posts, "
-            "and routine event listings.\n\n"
+            "and routine event listings. ALSO EXCLUDE how-to/roundup guide-format "
+            "pieces (e.g. \"How to get X for free/discount\", \"N places to Y\", "
+            "\"everything you need to know about Z\") even when the underlying "
+            "topic is a real local service or benefit — a specific news event "
+            "(a program launching, a policy changing) is news; a standing "
+            "explainer/guide compiling tips or options is not.\n\n"
             f"{listing}\n\n"
             'Reply with ONLY a JSON object: {"keep": [list of integer indices]}'
         )
